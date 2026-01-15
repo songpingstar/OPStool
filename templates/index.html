@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>运维工具箱</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="header">
+    <h1>运维工具箱</h1>
+    <nav class="header-nav">
+        <a href="/manage/scripts" class="nav-link">脚本管理</a>
+    </nav>
+</header>
+<main class="layout">
+    <aside class="sidebar">
+        <h2>分类</h2>
+        <ul>
+            {% for cat in categories %}
+                <li>{{ cat.name }}</li>
+            {% else %}
+                <li>暂无分类</li>
+            {% endfor %}
+        </ul>
+    </aside>
+    <section class="content">
+        <h2>最近更新脚本</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>标题</th>
+                <th>类型</th>
+                <th>危险</th>
+                <th>更新时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for s in recent_scripts %}
+                <tr>
+                    <td>{{ s.title }}</td>
+                    <td>{{ s.script_type }}</td>
+                    <td>{{ "是" if s.is_dangerous else "否" }}</td>
+                    <td>{{ s.update_time }}</td>
+                    <td>
+                        <a href="/scripts/{{ s.id }}">详情</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">暂无脚本</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
+

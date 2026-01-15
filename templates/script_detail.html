@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>脚本详情 - {{ script.title }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="header">
+    <a href="/" class="back-link">返回列表</a>
+    <h1>{{ script.title }}</h1>
+</header>
+<main class="layout detail-layout">
+    <section class="script-meta">
+        <h2>基本信息</h2>
+        <p><strong>分类：</strong>{{ script.category.name if script.category else "未分类" }}</p>
+        <p><strong>类型：</strong>{{ script.script_type }}</p>
+        <p><strong>危险操作：</strong>{{ "是" if script.is_dangerous else "否" }}</p>
+        <p><strong>描述：</strong>{{ script.description or "-" }}</p>
+        <button id="run-btn">运行脚本</button>
+    </section>
+    <section class="script-content">
+        <h2>脚本内容</h2>
+        <textarea id="code-editor" spellcheck="false"></textarea>
+        <div class="editor-actions">
+            <button id="save-btn">保存为新版本</button>
+            <span id="version-label">
+                当前版本：{{ latest_version.version if latest_version else 0 }}
+            </span>
+        </div>
+    </section>
+    <section class="script-exec">
+        <h2>最近执行记录</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
+                <th>状态</th>
+                <th>退出码</th>
+                <th>操作人</th>
+                <th>查看日志</th>
+            </tr>
+            </thead>
+            <tbody id="exec-tbody">
+            {% for r in recent_exec %}
+                <tr data-exec-id="{{ r.id }}">
+                    <td>{{ r.id }}</td>
+                    <td>{{ r.start_time }}</td>
+                    <td>{{ r.end_time or "-" }}</td>
+                    <td>{{ r.status }}</td>
+                    <td>{{ r.exit_code if r.exit_code is not none else "-" }}</td>
+                    <td>{{ r.operator or "-" }}</td>
+                    <td><button class="log-btn" data-exec-id="{{ r.id }}">查看</button></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">暂无执行记录</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <pre id="log-viewer" class="log-viewer"></pre>
+    </section>
+</main>
+<script>
+    const scriptId = {{ script.id }};
+
+    async function loadContent() {
+        const resp = await fetch(`/api/scripts/${scriptId}/content`);
+        const data = await resp.json();
+        document.getElementById("code-editor").value = data.content || "";
+        document.getElementById("version-label").innerText = "当前版本：" + data.version;
+    }
+
+    async function saveContent() {
+        const content = document.getElementById("code-editor").value;
+        await fetch(`/api/scripts/${scriptId}/content`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({content: content, editor: "web"})
+        });
+        await loadContent();
+        alert("已保存新版本");
+    }
+
+    async function runScript() {
+        const resp = await fetch(`/api/scripts/${scriptId}/run`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({params_json: null, operator: "web"})
+        });
+        const data = await resp.json();
+        await refreshExecRow(data.id);
+        await loadLog(data.id);
+    }
+
+    async function loadLog(execId) {
+        const resp = await fetch(`/api/exec/${execId}/log`);
+        const text = await resp.text();
+        document.getElementById("log-viewer").innerText = text || "暂无日志";
+    }
+
+    async function refreshExecRow(execId) {
+        const resp = await fetch(`/api/exec/${execId}`);
+        const data = await resp.json();
+        let row = document.querySelector(`tr[data-exec-id="${execId}"]`);
+        if (!row) {
+            row = document.createElement("tr");
+            row.setAttribute("data-exec-id", execId);
+            row.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td><td><button class="log-btn" data-exec-id=""></button></td>`;
+            document.getElementById("exec-tbody").prepend(row);
+        }
+        const cells = row.querySelectorAll("td");
+        cells[0].innerText = data.id;
+        cells[1].innerText = data.start_time;
+        cells[2].innerText = data.end_time || "-";
+        cells[3].innerText = data.status;
+        cells[4].innerText = data.exit_code ?? "-";
+        cells[5].innerText = data.operator || "-";
+        const btn = row.querySelector(".log-btn");
+        btn.setAttribute("data-exec-id", data.id);
+        btn.innerText = "查看";
+    }
+
+    document.getElementById("save-btn").addEventListener("click", saveContent);
+    document.getElementById("run-btn").addEventListener("click", runScript);
+    document.getElementById("exec-tbody").addEventListener("click", function (e) {
+        if (e.target.classList.contains("log-btn")) {
+            const id = e.target.getAttribute("data-exec-id");
+            loadLog(id);
+        }
+    });
+
+    loadContent();
+</script>
+</body>
+</html>
+
