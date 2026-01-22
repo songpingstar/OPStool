@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>脚本管理 - 运维工具箱</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="header">
+    <a href="/" class="back-link">返回首页</a>
+    <h1>脚本管理</h1>
+</header>
+<main class="layout manage-layout">
+    <section class="manage-panel">
+        <h2>新增分类</h2>
+        <div class="form-row">
+            <label>名称</label>
+            <input id="cat-name" type="text" placeholder="例如：常用运维操作">
+        </div>
+        <div class="form-row">
+            <label>描述</label>
+            <input id="cat-desc" type="text" placeholder="可选">
+        </div>
+        <div class="form-row">
+            <label>排序</label>
+            <input id="cat-order" type="number" value="0">
+        </div>
+        <button id="cat-create-btn">创建分类</button>
+
+        <h2 style="margin-top: 24px;">新增脚本</h2>
+        <div class="form-row">
+            <label>所属分类</label>
+            <select id="script-category">
+                <option value="">未分类</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-row">
+            <label>标题</label>
+            <input id="script-title" type="text" placeholder="脚本显示名称">
+        </div>
+        <div class="form-row">
+            <label>描述</label>
+            <input id="script-desc" type="text" placeholder="脚本用途说明">
+        </div>
+        <div class="form-row">
+            <label>类型</label>
+            <select id="script-type">
+                <option value="python">Python</option>
+                <option value="powershell">PowerShell</option>
+                <option value="shell">Shell/Bash</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>脚本路径</label>
+            <input id="script-path" type="text" placeholder="例如：sys_tools/info_collect.py">
+        </div>
+        <div class="form-row">
+            <label>危险操作</label>
+            <input id="script-danger" type="checkbox">
+            <span class="hint-text">例如重启服务、批量删除等</span>
+        </div>
+        <div class="form-row">
+            <label>初始内容</label>
+            <textarea id="script-content" rows="8" placeholder="# 可选，在此直接编写脚本初始内容"></textarea>
+        </div>
+        <button id="script-create-btn">创建脚本</button>
+    </section>
+
+    <section class="content">
+        <h2>脚本列表</h2>
+        <div class="form-row">
+            <label>关键字</label>
+            <input id="search-keyword" type="text" placeholder="按标题搜索">
+            <button id="search-btn">搜索</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>标题</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>危险</th>
+                <th>启用</th>
+                <th>更新时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="script-table-body">
+            </tbody>
+        </table>
+    </section>
+</main>
+<script>
+    async function createCategory() {
+        const name = document.getElementById("cat-name").value.trim();
+        if (!name) {
+            alert("分类名称不能为空");
+            return;
+        }
+        const desc = document.getElementById("cat-desc").value.trim();
+        const order = parseInt(document.getElementById("cat-order").value || "0");
+        const resp = await fetch("/api/categories", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name: name, description: desc || null, order: order})
+        });
+        if (!resp.ok) {
+            alert("创建分类失败");
+            return;
+        }
+        alert("分类创建成功，刷新页面后可在下拉框中选择");
+    }
+
+    async function createScript() {
+        const categoryId = document.getElementById("script-category").value;
+        const title = document.getElementById("script-title").value.trim();
+        const desc = document.getElementById("script-desc").value.trim();
+        const type = document.getElementById("script-type").value;
+        const path = document.getElementById("script-path").value.trim();
+        const danger = document.getElementById("script-danger").checked;
+        const content = document.getElementById("script-content").value;
+
+        if (!title) {
+            alert("脚本标题不能为空");
+            return;
+        }
+        if (!path) {
+            alert("脚本路径不能为空");
+            return;
+        }
+
+        const payload = {
+            category_id: categoryId ? parseInt(categoryId) : null,
+            title: title,
+            description: desc || null,
+            script_type: type,
+            exec_command_template: null,
+            script_path: path,
+            enabled: true,
+            is_dangerous: danger,
+            initial_content: content || null
+        };
+        const resp = await fetch("/api/scripts", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            alert("创建脚本失败");
+            return;
+        }
+        document.getElementById("script-title").value = "";
+        document.getElementById("script-desc").value = "";
+        document.getElementById("script-path").value = "";
+        document.getElementById("script-danger").checked = false;
+        document.getElementById("script-content").value = "";
+        await loadScripts();
+    }
+
+    async function loadScripts() {
+        const keyword = document.getElementById("search-keyword").value.trim();
+        let url = "/api/scripts";
+        if (keyword) {
+            url += "?keyword=" + encodeURIComponent(keyword);
+        }
+        const resp = await fetch(url);
+        const data = await resp.json();
+        const tbody = document.getElementById("script-table-body");
+        tbody.innerHTML = "";
+        if (!data.length) {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = 8;
+            td.innerText = "暂无脚本";
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+            return;
+        }
+        for (const s of data) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${s.id}</td>
+                <td>${s.title}</td>
+                <td>${s.script_type}</td>
+                <td>${s.category_id || "-"}</td>
+                <td>${s.is_dangerous ? "是" : "否"}</td>
+                <td>${s.enabled ? "是" : "否"}</td>
+                <td>${s.update_time}</td>
+                <td>
+                    <a href="/scripts/${s.id}" target="_blank">详情</a>
+                    <button class="disable-btn" data-id="${s.id}">${s.enabled ? "禁用" : "启用"}</button>
+                    <button class="delete-btn" data-id="${s.id}" data-title="${s.title}">删除</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    async function toggleScriptEnabled(id, enabled) {
+        const resp = await fetch("/api/scripts/" + id, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({enabled: !enabled})
+        });
+        if (!resp.ok) {
+            alert("更新脚本状态失败");
+            return;
+        }
+        await loadScripts();
+    }
+
+    document.getElementById("cat-create-btn").addEventListener("click", createCategory);
+    document.getElementById("script-create-btn").addEventListener("click", createScript);
+    document.getElementById("search-btn").addEventListener("click", loadScripts);
+    async function deleteScript(id, title) {
+        if (!confirm(`确定要删除脚本"${title}"吗？\n\n此操作将：\n- 从数据库中删除脚本记录\n- 删除本地脚本文件\n- 删除所有版本历史和执行记录\n\n此操作不可恢复！`)) {
+            return;
+        }
+        const resp = await fetch("/api/scripts/" + id, {
+            method: "DELETE"
+        });
+        if (!resp.ok) {
+            alert("删除脚本失败");
+            return;
+        }
+        await loadScripts();
+    }
+
+    document.getElementById("script-table-body").addEventListener("click", function (e) {
+        if (e.target.classList.contains("disable-btn")) {
+            const id = parseInt(e.target.getAttribute("data-id"));
+            const enabledText = e.target.innerText === "禁用";
+            toggleScriptEnabled(id, enabledText);
+        } else if (e.target.classList.contains("delete-btn")) {
+            const id = parseInt(e.target.getAttribute("data-id"));
+            const title = e.target.getAttribute("data-title");
+            deleteScript(id, title);
+        }
+    });
+
+    loadScripts();
+</script>
+</body>
+</html>
+
