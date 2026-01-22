@@ -10,6 +10,12 @@
     <h1>运维工具箱</h1>
     <nav class="header-nav">
         <a href="/manage/scripts" class="nav-link">脚本管理</a>
+        {% if current_user %}
+        <span class="user-info">用户: {{ current_user.username }}</span>
+        <form method="POST" action="/api/logout" style="display: inline;">
+            <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer; color: inherit; text-decoration: underline;">登出</button>
+        </form>
+        {% endif %}
     </nav>
 </header>
 <main class="layout">

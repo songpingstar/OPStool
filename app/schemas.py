@@ -90,3 +90,23 @@ class ScriptExecOut(BaseModel):
     class Config:
         from_attributes = True
 
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    is_active: bool
+    create_time: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    is_active: bool = True

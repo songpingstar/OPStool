@@ -82,3 +82,12 @@ class ScriptExecRecord(Base):
 
     script = relationship("ScriptItem", back_populates="exec_records")
 
+
+class User(Base):
+    __tablename__ = "user"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), nullable=False, unique=True)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    create_time = Column(DateTime, default=datetime.utcnow)

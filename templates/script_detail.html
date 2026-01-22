@@ -9,6 +9,14 @@
 <header class="header">
     <a href="/" class="back-link">返回列表</a>
     <h1>{{ script.title }}</h1>
+    <nav class="header-nav" style="margin-left: auto;">
+        {% if current_user %}
+        <span class="user-info">用户: {{ current_user.username }}</span>
+        <form method="POST" action="/api/logout" style="display: inline;">
+            <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer; color: inherit; text-decoration: underline;">登出</button>
+        </form>
+        {% endif %}
+    </nav>
 </header>
 <main class="layout detail-layout">
     <section class="script-meta">

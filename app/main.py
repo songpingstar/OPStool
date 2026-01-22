@@ -1,13 +1,15 @@
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 
 from . import models, schemas
+from .auth import authenticate_user, get_current_user, get_current_user_optional, get_password_hash
 from .database import Base, engine, get_db
 from .executor import run_script
 
@@ -15,14 +17,81 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="运维工具箱")
 
+# 配置 Session 中间件
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="your-secret-key-here-change-in-production",  # 在生产环境中应该从环境变量读取
+    max_age=86400,  # 24小时
+    same_site="lax",
+    https_only=False,  # 开发环境设为 False，生产环境应设为 True
+)
+
 templates = Jinja2Templates(directory="templates")
 static_dir = Path("static")
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    """登录页面"""
+    error = request.query_params.get("error", "")
+    return templates.TemplateResponse(
+        "login.html",
+        {
+            "request": request,
+            "error": error,
+        },
+    )
+
+
+@app.post("/api/login")
+def login(
+    username: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/"),
+    request: Request = ...,
+    db: Session = Depends(get_db),
+):
+    """登录接口"""
+    user = authenticate_user(db, username, password)
+    if not user:
+        return RedirectResponse(
+            url="/login?error=用户名或密码错误", status_code=status.HTTP_303_SEE_OTHER
+        )
+    
+    # 设置 Session
+    request.session["user_id"] = user.id
+    request.session["username"] = user.username
+    
+    # 重定向到原始页面或首页
+    return RedirectResponse(url=next, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/api/logout")
+def logout(request: Request):
+    """登出接口"""
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/api/me", response_model=schemas.UserOut)
+def get_current_user_info(current_user: models.User = Depends(get_current_user)):
+    """获取当前登录用户信息"""
+    return current_user
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+def index(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_current_user_optional),
+):
+    # 如果未登录，重定向到登录页面
+    if not current_user:
+        next_url = str(request.url)
+        return RedirectResponse(url=f"/login?next={next_url}", status_code=status.HTTP_303_SEE_OTHER)
+    
     categories = db.query(models.ScriptCategory).order_by(
         models.ScriptCategory.order
     )
@@ -39,12 +108,22 @@ def index(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "categories": categories,
             "recent_scripts": scripts,
+            "current_user": current_user,
         },
     )
 
 
 @app.get("/manage/scripts", response_class=HTMLResponse)
-def manage_scripts(request: Request, db: Session = Depends(get_db)):
+def manage_scripts(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_current_user_optional),
+):
+    # 如果未登录，重定向到登录页面
+    if not current_user:
+        next_url = str(request.url)
+        return RedirectResponse(url=f"/login?next={next_url}", status_code=status.HTTP_303_SEE_OTHER)
+    
     categories = (
         db.query(models.ScriptCategory)
         .order_by(models.ScriptCategory.order)
@@ -55,6 +134,7 @@ def manage_scripts(request: Request, db: Session = Depends(get_db)):
         {
             "request": request,
             "categories": categories,
+            "current_user": current_user,
         },
     )
 
@@ -63,8 +143,15 @@ def manage_scripts(request: Request, db: Session = Depends(get_db)):
     "/scripts/{script_id}", response_class=HTMLResponse, name="script_detail"
 )
 def script_detail(
-    script_id: int, request: Request, db: Session = Depends(get_db)
+    script_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_current_user_optional),
 ):
+    # 如果未登录，重定向到登录页面
+    if not current_user:
+        next_url = str(request.url)
+        return RedirectResponse(url=f"/login?next={next_url}", status_code=status.HTTP_303_SEE_OTHER)
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="脚本不存在")
@@ -88,12 +175,16 @@ def script_detail(
             "script": script,
             "latest_version": latest_version,
             "recent_exec": recent_exec,
+            "current_user": current_user,
         },
     )
 
 
 @app.get("/api/categories", response_model=List[schemas.ScriptCategoryOut])
-def list_categories(db: Session = Depends(get_db)):
+def list_categories(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     items = db.query(models.ScriptCategory).order_by(
         models.ScriptCategory.order
     )
@@ -102,7 +193,9 @@ def list_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/categories", response_model=schemas.ScriptCategoryOut)
 def create_category(
-    payload: schemas.ScriptCategoryCreate, db: Session = Depends(get_db)
+    payload: schemas.ScriptCategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     obj = models.ScriptCategory(**payload.model_dump())
     db.add(obj)
@@ -116,6 +209,7 @@ def update_category(
     category_id: int,
     payload: schemas.ScriptCategoryUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     obj = db.query(models.ScriptCategory).get(category_id)
     if not obj:
@@ -127,7 +221,11 @@ def update_category(
 
 
 @app.delete("/api/categories/{category_id}")
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     obj = db.query(models.ScriptCategory).get(category_id)
     if not obj:
         raise HTTPException(status_code=404, detail="分类不存在")
@@ -141,6 +239,7 @@ def list_scripts(
     category_id: Optional[int] = None,
     keyword: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     query = db.query(models.ScriptItem)
     if category_id is not None:
@@ -152,7 +251,11 @@ def list_scripts(
 
 
 @app.get("/api/scripts/{script_id}", response_model=schemas.ScriptItemOut)
-def get_script(script_id: int, db: Session = Depends(get_db)):
+def get_script(
+    script_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="脚本不存在")
@@ -161,7 +264,9 @@ def get_script(script_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/scripts", response_model=schemas.ScriptItemOut)
 def create_script(
-    payload: schemas.ScriptItemCreate, db: Session = Depends(get_db)
+    payload: schemas.ScriptItemCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     script = models.ScriptItem(
         category_id=payload.category_id,
@@ -205,6 +310,7 @@ def update_script(
     script_id: int,
     payload: schemas.ScriptItemUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -216,7 +322,11 @@ def update_script(
 
 
 @app.delete("/api/scripts/{script_id}")
-def delete_script(script_id: int, db: Session = Depends(get_db)):
+def delete_script(
+    script_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="脚本不存在")
@@ -252,7 +362,11 @@ def delete_script(script_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/scripts/{script_id}/content", response_model=schemas.ScriptContentOut)
-def get_script_content(script_id: int, db: Session = Depends(get_db)):
+def get_script_content(
+    script_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="脚本不存在")
@@ -285,6 +399,7 @@ def update_script_content(
     script_id: int,
     payload: schemas.ScriptContentUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -324,6 +439,7 @@ def run_script_api(
     script_id: int,
     payload: schemas.ScriptExecStart,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -338,7 +454,11 @@ def run_script_api(
 
 
 @app.get("/api/exec/{exec_id}", response_model=schemas.ScriptExecOut)
-def get_exec(exec_id: int, db: Session = Depends(get_db)):
+def get_exec(
+    exec_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     rec = db.query(models.ScriptExecRecord).get(exec_id)
     if not rec:
         raise HTTPException(status_code=404, detail="执行记录不存在")
@@ -346,7 +466,11 @@ def get_exec(exec_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/exec/{exec_id}/log", response_class=PlainTextResponse)
-def get_exec_log(exec_id: int, db: Session = Depends(get_db)):
+def get_exec_log(
+    exec_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     rec = db.query(models.ScriptExecRecord).get(exec_id)
     if not rec:
         raise HTTPException(status_code=404, detail="执行记录不存在")
