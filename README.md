@@ -27,9 +27,13 @@ python scripts/create_admin.py <用户名> <密码>
 示例：
 ```powershell
 python scripts/create_admin.py admin mypassword123
-python scripts/create_admin.py admin mypassword123 --update
 ```
 
+更新管理员密码
+示例：
+```
+python scripts/create_admin.py admin mypassword123 --update
+```
 ### 3. 启动应用
 
 ```powershell
