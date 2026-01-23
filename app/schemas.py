@@ -4,6 +4,39 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class UserBase(BaseModel):
+    username: str
+    email: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserOut(UserBase):
+    id: int
+    is_active: bool
+    is_superuser: bool
+    create_time: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class ScriptCategoryBase(BaseModel):
     name: str
     description: Optional[str] = None

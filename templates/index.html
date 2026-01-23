@@ -10,6 +10,7 @@
     <h1>运维工具箱</h1>
     <nav class="header-nav">
         <a href="/manage/scripts" class="nav-link">脚本管理</a>
+        <a href="#" onclick="logout()" class="nav-link">退出登录</a>
     </nav>
 </header>
 <main class="layout">
@@ -53,6 +54,19 @@
         </table>
     </section>
 </main>
+
+<script>
+    async function logout() {
+        try {
+            await fetch('/api/logout', {
+                method: 'POST'
+            });
+            window.location.href = '/login';
+        } catch (error) {
+            window.location.href = '/login';
+        }
+    }
+</script>
 </body>
 </html>
 

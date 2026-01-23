@@ -9,6 +9,7 @@
 <header class="header">
     <a href="/" class="back-link">返回首页</a>
     <h1>脚本管理</h1>
+    <a href="#" onclick="logout()" class="nav-link" style="margin-left: auto;">退出登录</a>
 </header>
 <main class="layout manage-layout">
     <section class="manage-panel">
@@ -243,6 +244,19 @@
     });
 
     loadScripts();
+</script>
+
+<script>
+    async function logout() {
+        try {
+            await fetch('/api/logout', {
+                method: 'POST'
+            });
+            window.location.href = '/login';
+        } catch (error) {
+            window.location.href = '/login';
+        }
+    }
 </script>
 </body>
 </html>

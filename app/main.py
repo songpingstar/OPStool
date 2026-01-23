@@ -1,13 +1,14 @@
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from . import models, schemas
+from . import auth, models, schemas
 from .database import Base, engine, get_db
 from .executor import run_script
 
@@ -21,8 +22,83 @@ static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+async def get_current_user_from_cookie(
+    request: Request, db: Session = Depends(get_db)
+) -> Optional[models.User]:
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    return auth.get_current_user(token, db)
+
+
+async def require_auth(
+    request: Request, db: Session = Depends(get_db)
+) -> models.User:
+    user = await get_current_user_from_cookie(request, db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未登录",
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户已被禁用",
+        )
+    return user
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.post("/api/login")
+def login(
+    request: Request,
+    payload: schemas.LoginRequest,
+    db: Session = Depends(get_db),
+):
+    user = auth.authenticate_user(db, payload.username, payload.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+        )
+    access_token = auth.create_access_token(data={"sub": user.username})
+    
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return response
+
+
+@app.post("/api/logout")
+def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("access_token")
+    return response
+
+
+@app.get("/api/me", response_model=schemas.UserOut)
+async def get_me(current_user: models.User = Depends(require_auth)):
+    return current_user
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+async def index(
+    request: Request, db: Session = Depends(get_db)
+):
+    current_user = await get_current_user_from_cookie(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
     categories = db.query(models.ScriptCategory).order_by(
         models.ScriptCategory.order
     )
@@ -39,12 +115,17 @@ def index(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "categories": categories,
             "recent_scripts": scripts,
+            "current_user": current_user,
         },
     )
 
 
 @app.get("/manage/scripts", response_class=HTMLResponse)
-def manage_scripts(request: Request, db: Session = Depends(get_db)):
+async def manage_scripts(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
+):
     categories = (
         db.query(models.ScriptCategory)
         .order_by(models.ScriptCategory.order)
@@ -62,8 +143,11 @@ def manage_scripts(request: Request, db: Session = Depends(get_db)):
 @app.get(
     "/scripts/{script_id}", response_class=HTMLResponse, name="script_detail"
 )
-def script_detail(
-    script_id: int, request: Request, db: Session = Depends(get_db)
+async def script_detail(
+    script_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -102,7 +186,9 @@ def list_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/categories", response_model=schemas.ScriptCategoryOut)
 def create_category(
-    payload: schemas.ScriptCategoryCreate, db: Session = Depends(get_db)
+    payload: schemas.ScriptCategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     obj = models.ScriptCategory(**payload.model_dump())
     db.add(obj)
@@ -116,6 +202,7 @@ def update_category(
     category_id: int,
     payload: schemas.ScriptCategoryUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     obj = db.query(models.ScriptCategory).get(category_id)
     if not obj:
@@ -127,7 +214,11 @@ def update_category(
 
 
 @app.delete("/api/categories/{category_id}")
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
+):
     obj = db.query(models.ScriptCategory).get(category_id)
     if not obj:
         raise HTTPException(status_code=404, detail="分类不存在")
@@ -161,7 +252,9 @@ def get_script(script_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/scripts", response_model=schemas.ScriptItemOut)
 def create_script(
-    payload: schemas.ScriptItemCreate, db: Session = Depends(get_db)
+    payload: schemas.ScriptItemCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     script = models.ScriptItem(
         category_id=payload.category_id,
@@ -205,6 +298,7 @@ def update_script(
     script_id: int,
     payload: schemas.ScriptItemUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -216,7 +310,11 @@ def update_script(
 
 
 @app.delete("/api/scripts/{script_id}")
-def delete_script(script_id: int, db: Session = Depends(get_db)):
+def delete_script(
+    script_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
+):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="脚本不存在")
@@ -285,6 +383,7 @@ def update_script_content(
     script_id: int,
     payload: schemas.ScriptContentUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
@@ -324,6 +423,7 @@ def run_script_api(
     script_id: int,
     payload: schemas.ScriptExecStart,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
 ):
     script = db.query(models.ScriptItem).get(script_id)
     if not script:
