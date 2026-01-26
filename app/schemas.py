@@ -66,12 +66,19 @@ class ScriptItemBase(BaseModel):
     description: Optional[str] = None
     script_type: str
     exec_command_template: Optional[str] = None
-    script_path: str
+    script_path: Optional[str] = None
     enabled: bool = True
     is_dangerous: bool = False
 
 
-class ScriptItemCreate(ScriptItemBase):
+class ScriptItemCreate(BaseModel):
+    category_id: Optional[int] = None
+    title: str
+    description: Optional[str] = None
+    script_type: str
+    exec_command_template: Optional[str] = None
+    enabled: bool = True
+    is_dangerous: bool = False
     initial_content: Optional[str] = None
 
 

@@ -310,7 +310,7 @@ def create_script(
         description=payload.description,
         script_type=payload.script_type,
         exec_command_template=payload.exec_command_template,
-        script_path=payload.script_path,
+        script_path=None,
         enabled=payload.enabled,
         is_dangerous=payload.is_dangerous,
     )
@@ -318,15 +318,18 @@ def create_script(
     db.commit()
     db.refresh(script)
 
+    scripts_dir = Path("scripts")
+    scripts_dir.mkdir(exist_ok=True)
+    
+    ext_map = {
+        "python": ".py",
+        "powershell": ".ps1",
+        "shell": ".sh"
+    }
+    ext = ext_map.get(payload.script_type, ".py")
+    script_path = scripts_dir / f"{script.id}{ext}"
+    
     if payload.initial_content is not None:
-        scripts_dir = Path("scripts")
-        scripts_dir.mkdir(exist_ok=True)
-        script_path = (
-            Path(script.script_path)
-            if Path(script.script_path).is_absolute()
-            else scripts_dir / script.script_path
-        )
-        script_path.parent.mkdir(parents=True, exist_ok=True)
         script_path.write_text(payload.initial_content, encoding="utf-8")
 
         version = models.ScriptVersion(
@@ -337,6 +340,10 @@ def create_script(
         )
         db.add(version)
         db.commit()
+    
+    script.script_path = str(script_path)
+    db.commit()
+    db.refresh(script)
 
     return script
 

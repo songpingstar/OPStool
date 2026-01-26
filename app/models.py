@@ -47,7 +47,7 @@ class ScriptItem(Base):
     description = Column(String(500), nullable=True)
     script_type = Column(String(50), nullable=False)  # python/shell/powershell
     exec_command_template = Column(String(500), nullable=True)
-    script_path = Column(String(500), nullable=False)
+    script_path = Column(String(500), nullable=True)
     enabled = Column(Boolean, default=True)
     is_dangerous = Column(Boolean, default=False)
     create_time = Column(DateTime, default=datetime.utcnow)

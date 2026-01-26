@@ -31,10 +31,6 @@
             </select>
         </div>
         <div class="form-row">
-            <label>脚本路径</label>
-            <input id="script-path" type="text" placeholder="例如：sys_tools/info_collect.py">
-        </div>
-        <div class="form-row">
             <label>危险操作</label>
             <input id="script-danger" type="checkbox">
             <span class="hint-text">例如重启服务、批量删除等</span>
@@ -78,16 +74,11 @@
         const title = document.getElementById("script-title").value.trim();
         const desc = document.getElementById("script-desc").value.trim();
         const type = document.getElementById("script-type").value;
-        const path = document.getElementById("script-path").value.trim();
         const danger = document.getElementById("script-danger").checked;
         const content = document.getElementById("script-content").value;
 
         if (!title) {
             alert("脚本标题不能为空");
-            return;
-        }
-        if (!path) {
-            alert("脚本路径不能为空");
             return;
         }
 
@@ -97,7 +88,6 @@
             description: desc || null,
             script_type: type,
             exec_command_template: null,
-            script_path: path,
             is_dangerous: danger,
             initial_content: content || null
         };
@@ -112,7 +102,6 @@
         }
         document.getElementById("script-title").value = "";
         document.getElementById("script-desc").value = "";
-        document.getElementById("script-path").value = "";
         document.getElementById("script-danger").checked = false;
         document.getElementById("script-content").value = "";
         await loadScripts();
