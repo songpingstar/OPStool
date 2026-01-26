@@ -142,7 +142,6 @@
             return;
         }
         
-        alert("分类创建成功");
         document.getElementById("cat-name").value = "";
         document.getElementById("cat-desc").value = "";
         await loadCategories();
@@ -221,7 +220,6 @@
             return;
         }
         
-        alert("分类更新成功");
         hideEditForm(id);
         await loadCategories();
     }
@@ -241,7 +239,6 @@
             return;
         }
         
-        alert("分类删除成功");
         await loadCategories();
     }
 
