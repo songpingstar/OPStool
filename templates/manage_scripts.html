@@ -13,22 +13,7 @@
 </header>
 <main class="layout manage-layout">
     <section class="manage-panel">
-        <h2>新增分类</h2>
-        <div class="form-row">
-            <label>名称</label>
-            <input id="cat-name" type="text" placeholder="例如：常用运维操作">
-        </div>
-        <div class="form-row">
-            <label>描述</label>
-            <input id="cat-desc" type="text" placeholder="可选">
-        </div>
-        <div class="form-row">
-            <label>排序</label>
-            <input id="cat-order" type="number" value="0">
-        </div>
-        <button id="cat-create-btn">创建分类</button>
-
-        <h2 style="margin-top: 24px;">新增脚本</h2>
+        <h2>新增脚本</h2>
         <div class="form-row">
             <label>所属分类</label>
             <select id="script-category">
@@ -96,26 +81,6 @@
     </section>
 </main>
 <script>
-    async function createCategory() {
-        const name = document.getElementById("cat-name").value.trim();
-        if (!name) {
-            alert("分类名称不能为空");
-            return;
-        }
-        const desc = document.getElementById("cat-desc").value.trim();
-        const order = parseInt(document.getElementById("cat-order").value || "0");
-        const resp = await fetch("/api/categories", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({name: name, description: desc || null, order: order})
-        });
-        if (!resp.ok) {
-            alert("创建分类失败");
-            return;
-        }
-        alert("分类创建成功，刷新页面后可在下拉框中选择");
-    }
-
     async function createScript() {
         const categoryId = document.getElementById("script-category").value;
         const title = document.getElementById("script-title").value.trim();
@@ -214,7 +179,6 @@
         await loadScripts();
     }
 
-    document.getElementById("cat-create-btn").addEventListener("click", createCategory);
     document.getElementById("script-create-btn").addEventListener("click", createScript);
     document.getElementById("search-btn").addEventListener("click", loadScripts);
     async function deleteScript(id, title) {
