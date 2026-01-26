@@ -71,14 +71,6 @@ OPStool/
 
 默认端口为 8000，可通过启动命令的 `--port` 参数修改。
 
-## 安全建议
-
-1. 修改默认管理员密码
-2. 更改 `app/auth.py` 中的 `SECRET_KEY`
-3. 在生产环境中使用 HTTPS
-4. 定期备份数据库文件
-5. 对危险脚本操作添加二次确认
-
 ## 启动应用
 ```bash
 uvicorn app.main:app --reload --port 8080
