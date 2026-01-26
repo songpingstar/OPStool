@@ -16,6 +16,12 @@ body {
 .back-link {
     color: #9fb3c8;
     text-decoration: none;
+    transition: all 0.2s;
+}
+
+.back-link:hover {
+    color: #fff;
+    transform: translateX(-2px);
 }
 
 .layout {
