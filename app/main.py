@@ -104,7 +104,6 @@ async def index(
     )
     scripts = (
         db.query(models.ScriptItem)
-        .filter(models.ScriptItem.enabled.is_(True))
         .order_by(models.ScriptItem.update_time.desc())
         .limit(20)
         .all()
@@ -247,7 +246,29 @@ def list_scripts(
     if keyword:
         like = f"%{keyword}%"
         query = query.filter(models.ScriptItem.title.like(like))
-    return query.order_by(models.ScriptItem.update_time.desc()).all()
+    scripts = query.order_by(models.ScriptItem.update_time.desc()).all()
+    
+    result = []
+    for script in scripts:
+        category_name = None
+        if script.category:
+            category_name = script.category.name
+        script_dict = {
+            "id": script.id,
+            "category_id": script.category_id,
+            "title": script.title,
+            "description": script.description,
+            "script_type": script.script_type,
+            "exec_command_template": script.exec_command_template,
+            "script_path": script.script_path,
+            "enabled": script.enabled,
+            "is_dangerous": script.is_dangerous,
+            "create_time": script.create_time,
+            "update_time": script.update_time,
+            "category_name": category_name
+        }
+        result.append(script_dict)
+    return result
 
 
 @app.get("/api/scripts/{script_id}", response_model=schemas.ScriptItemOut)

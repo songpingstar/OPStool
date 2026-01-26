@@ -46,6 +46,7 @@
             <tr>
                 <th>标题</th>
                 <th>类型</th>
+                <th>分类</th>
                 <th>危险</th>
                 <th>更新时间</th>
                 <th>操作</th>
@@ -56,6 +57,7 @@
                 <tr>
                     <td>{{ s.title }}</td>
                     <td>{{ s.script_type }}</td>
+                    <td>{{ s.category.name if s.category else "未分类" }}</td>
                     <td>{{ "是" if s.is_dangerous else "否" }}</td>
                     <td>{{ s.update_time }}</td>
                     <td>
@@ -63,7 +65,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="5">暂无脚本</td></tr>
+                <tr><td colspan="6">暂无脚本</td></tr>
             {% endfor %}
             </tbody>
         </table>

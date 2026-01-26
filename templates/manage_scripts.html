@@ -51,6 +51,9 @@
         <div class="form-row">
             <label>关键字</label>
             <input id="search-keyword" type="text" placeholder="按标题搜索">
+            <select id="search-category" style="max-width: 150px; margin-left: 10px;">
+                <option value="">所有分类</option>
+            </select>
             <button id="search-btn">搜索</button>
         </div>
         <table>
@@ -59,8 +62,8 @@
                 <th>ID</th>
                 <th>标题</th>
                 <th>类型</th>
+                <th>分类</th>
                 <th>危险</th>
-                <th>启用</th>
                 <th>更新时间</th>
                 <th>操作</th>
             </tr>
@@ -95,7 +98,6 @@
             script_type: type,
             exec_command_template: null,
             script_path: path,
-            enabled: true,
             is_dangerous: danger,
             initial_content: content || null
         };
@@ -118,9 +120,17 @@
 
     async function loadScripts() {
         const keyword = document.getElementById("search-keyword").value.trim();
+        const categoryId = document.getElementById("search-category").value;
         let url = "/api/scripts";
+        const params = [];
         if (keyword) {
-            url += "?keyword=" + encodeURIComponent(keyword);
+            params.push("keyword=" + encodeURIComponent(keyword));
+        }
+        if (categoryId) {
+            params.push("category_id=" + categoryId);
+        }
+        if (params.length > 0) {
+            url += "?" + params.join("&");
         }
         const resp = await fetch(url);
         const data = await resp.json();
@@ -141,12 +151,11 @@
                 <td>${s.id}</td>
                 <td>${s.title}</td>
                 <td>${s.script_type}</td>
+                <td>${s.category_name || "未分类"}</td>
                 <td>${s.is_dangerous ? "是" : "否"}</td>
-                <td>${s.enabled ? "是" : "否"}</td>
                 <td>${s.update_time}</td>
                 <td>
                     <a href="/scripts/${s.id}" target="_blank">详情</a>
-                    <button class="disable-btn" data-id="${s.id}">${s.enabled ? "禁用" : "启用"}</button>
                     <button class="delete-btn" data-id="${s.id}" data-title="${s.title}">删除</button>
                 </td>
             `;
@@ -154,17 +163,17 @@
         }
     }
 
-    async function toggleScriptEnabled(id, enabled) {
-        const resp = await fetch("/api/scripts/" + id, {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({enabled: !enabled})
-        });
-        if (!resp.ok) {
-            alert("更新脚本状态失败");
-            return;
+    async function loadCategories() {
+        const resp = await fetch("/api/categories");
+        const data = await resp.json();
+        const select = document.getElementById("search-category");
+        select.innerHTML = '<option value="">所有分类</option>';
+        for (const cat of data) {
+            const option = document.createElement("option");
+            option.value = cat.id;
+            option.innerText = cat.name;
+            select.appendChild(option);
         }
-        await loadScripts();
     }
 
     document.getElementById("script-create-btn").addEventListener("click", createScript);
@@ -184,17 +193,14 @@
     }
 
     document.getElementById("script-table-body").addEventListener("click", function (e) {
-        if (e.target.classList.contains("disable-btn")) {
-            const id = parseInt(e.target.getAttribute("data-id"));
-            const enabledText = e.target.innerText === "禁用";
-            toggleScriptEnabled(id, enabledText);
-        } else if (e.target.classList.contains("delete-btn")) {
+        if (e.target.classList.contains("delete-btn")) {
             const id = parseInt(e.target.getAttribute("data-id"));
             const title = e.target.getAttribute("data-title");
             deleteScript(id, title);
         }
     });
 
+    loadCategories();
     loadScripts();
 </script>
 

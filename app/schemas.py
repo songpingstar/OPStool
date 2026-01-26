@@ -90,6 +90,7 @@ class ScriptItemOut(ScriptItemBase):
     id: int
     create_time: datetime
     update_time: datetime
+    category_name: Optional[str] = None
 
     class Config:
         from_attributes = True
