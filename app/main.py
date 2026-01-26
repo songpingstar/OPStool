@@ -102,12 +102,31 @@ async def index(
     categories = db.query(models.ScriptCategory).order_by(
         models.ScriptCategory.order
     )
+    
+    from sqlalchemy import func, desc
+    subquery = (
+        db.query(
+            models.ScriptExecRecord.script_id,
+            func.max(models.ScriptExecRecord.start_time).label('last_exec_time')
+        )
+        .group_by(models.ScriptExecRecord.script_id)
+        .subquery()
+    )
+    
     scripts = (
         db.query(models.ScriptItem)
-        .order_by(models.ScriptItem.update_time.desc())
+        .join(subquery, models.ScriptItem.id == subquery.c.script_id)
+        .order_by(desc(subquery.c.last_exec_time))
         .limit(20)
         .all()
     )
+    
+    for script in scripts:
+        last_exec = db.query(models.ScriptExecRecord).filter(
+            models.ScriptExecRecord.script_id == script.id
+        ).order_by(models.ScriptExecRecord.start_time.desc()).first()
+        script.last_exec_time = last_exec.start_time if last_exec else None
+    
     return templates.TemplateResponse(
         "index.html",
         {
