@@ -41,6 +41,64 @@ body {
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.category-manage-icon {
+    color: #666;
+    text-decoration: none;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.category-manage-icon:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.script-manage-icon {
+    color: #666;
+    text-decoration: none;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.script-manage-icon:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
 .content, .script-meta, .script-content, .script-exec {
     background: #fff;
     border-radius: 8px;
@@ -191,4 +249,6 @@ textarea#code-editor {
     font-family: "Fira Code", monospace;
     font-size: 13px;
 }
+
+/* 强制刷新样式 - 版本 2.0 */
 

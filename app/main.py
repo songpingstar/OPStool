@@ -120,6 +120,20 @@ async def index(
     )
 
 
+@app.get("/manage/categories", response_class=HTMLResponse)
+async def manage_categories(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_auth),
+):
+    return templates.TemplateResponse(
+        "manage_categories.html",
+        {
+            "request": request,
+        },
+    )
+
+
 @app.get("/manage/scripts", response_class=HTMLResponse)
 async def manage_scripts(
     request: Request,

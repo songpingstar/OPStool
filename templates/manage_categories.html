@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>分类管理 - 运维工具箱</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .category-list {
+            margin-top: 20px;
+        }
+        .category-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .category-info {
+            flex: 1;
+        }
+        .category-name {
+            font-weight: 500;
+            font-size: 16px;
+        }
+        .category-desc {
+            color: #666;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .category-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-edit {
+            background: #007bff;
+            color: white;
+        }
+        .btn-edit:hover {
+            background: #0056b3;
+        }
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #c82333;
+        }
+        .btn-save {
+            background: #28a745;
+            color: white;
+        }
+        .btn-save:hover {
+            background: #218838;
+        }
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-cancel:hover {
+            background: #5a6268;
+        }
+        .edit-form {
+            display: none;
+            width: 100%;
+        }
+        .edit-form.active {
+            display: block;
+        }
+        .edit-form input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .edit-form .form-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .edit-form input[type="number"] {
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+<header class="header">
+    <a href="/" class="back-link">返回首页</a>
+    <h1>分类管理</h1>
+    <a href="#" onclick="logout()" class="nav-link" style="margin-left: auto;">退出登录</a>
+</header>
+<main class="layout manage-layout">
+    <section class="manage-panel">
+        <h2>新增分类</h2>
+        <div class="form-row">
+            <label>名称</label>
+            <input id="cat-name" type="text" placeholder="例如：常用运维操作">
+        </div>
+        <div class="form-row">
+            <label>描述</label>
+            <input id="cat-desc" type="text" placeholder="可选">
+        </div>
+        <div class="form-row">
+            <label>排序</label>
+            <input id="cat-order" type="number" value="0">
+        </div>
+        <button id="cat-create-btn">创建分类</button>
+    </section>
+
+    <section class="content">
+        <h2>分类列表</h2>
+        <div id="category-list" class="category-list">
+        </div>
+    </section>
+</main>
+
+<script>
+    async function createCategory() {
+        const name = document.getElementById("cat-name").value.trim();
+        if (!name) {
+            alert("分类名称不能为空");
+            return;
+        }
+        const desc = document.getElementById("cat-desc").value.trim();
+        const order = parseInt(document.getElementById("cat-order").value || "0");
+        
+        const resp = await fetch("/api/categories", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name: name, description: desc || null, order: order})
+        });
+        
+        if (!resp.ok) {
+            const error = await resp.json();
+            alert(error.detail || "创建分类失败");
+            return;
+        }
+        
+        alert("分类创建成功");
+        document.getElementById("cat-name").value = "";
+        document.getElementById("cat-desc").value = "";
+        document.getElementById("cat-order").value = "0";
+        await loadCategories();
+    }
+
+    async function loadCategories() {
+        const resp = await fetch("/api/categories");
+        const data = await resp.json();
+        const list = document.getElementById("category-list");
+        list.innerHTML = "";
+        
+        if (!data.length) {
+            list.innerHTML = "<p>暂无分类</p>";
+            return;
+        }
+        
+        for (const cat of data) {
+            const div = document.createElement("div");
+            div.className = "category-item";
+            div.innerHTML = `
+                <div class="category-info">
+                    <div class="category-name">${cat.name}</div>
+                    <div class="category-desc">${cat.description || "暂无描述"}</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 4px;">排序: ${cat.order}</div>
+                </div>
+                <div class="category-actions">
+                    <button class="btn btn-edit" onclick="showEditForm(${cat.id}, '${cat.name}', '${cat.description || ''}', ${cat.order})">编辑</button>
+                    <button class="btn btn-delete" onclick="deleteCategory(${cat.id}, '${cat.name}')">删除</button>
+                </div>
+                <div class="edit-form" id="edit-form-${cat.id}">
+                    <input type="text" id="edit-name-${cat.id}" placeholder="分类名称">
+                    <input type="text" id="edit-desc-${cat.id}" placeholder="描述">
+                    <div class="form-row">
+                        <input type="number" id="edit-order-${cat.id}" placeholder="排序">
+                        <button class="btn btn-save" onclick="updateCategory(${cat.id})">保存</button>
+                        <button class="btn btn-cancel" onclick="hideEditForm(${cat.id})">取消</button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+    }
+
+    function showEditForm(id, name, desc, order) {
+        const form = document.getElementById(`edit-form-${id}`);
+        document.getElementById(`edit-name-${id}`).value = name;
+        document.getElementById(`edit-desc-${id}`).value = desc;
+        document.getElementById(`edit-order-${id}`).value = order;
+        form.classList.add("active");
+    }
+
+    function hideEditForm(id) {
+        const form = document.getElementById(`edit-form-${id}`);
+        form.classList.remove("active");
+    }
+
+    async function updateCategory(id) {
+        const name = document.getElementById(`edit-name-${id}`).value.trim();
+        const desc = document.getElementById(`edit-desc-${id}`).value.trim();
+        const order = parseInt(document.getElementById(`edit-order-${id}`).value || "0");
+        
+        if (!name) {
+            alert("分类名称不能为空");
+            return;
+        }
+        
+        const resp = await fetch(`/api/categories/${id}`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                name: name,
+                description: desc || null,
+                order: order
+            })
+        });
+        
+        if (!resp.ok) {
+            const error = await resp.json();
+            alert(error.detail || "更新分类失败");
+            return;
+        }
+        
+        alert("分类更新成功");
+        hideEditForm(id);
+        await loadCategories();
+    }
+
+    async function deleteCategory(id, name) {
+        if (!confirm(`确定要删除分类"${name}"吗？`)) {
+            return;
+        }
+        
+        const resp = await fetch(`/api/categories/${id}`, {
+            method: "DELETE"
+        });
+        
+        if (!resp.ok) {
+            const error = await resp.json();
+            alert(error.detail || "删除分类失败");
+            return;
+        }
+        
+        alert("分类删除成功");
+        await loadCategories();
+    }
+
+    document.getElementById("cat-create-btn").addEventListener("click", createCategory);
+    loadCategories();
+</script>
+
+<script>
+    async function logout() {
+        try {
+            await fetch('/api/logout', {
+                method: 'POST'
+            });
+            window.location.href = '/login';
+        } catch (error) {
+            window.location.href = '/login';
+        }
+    }
+</script>
+</body>
+</html>
