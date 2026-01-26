@@ -10,87 +10,120 @@
         }
         .category-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            padding: 12px 16px;
+            padding: 16px 20px;
             background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-            margin-bottom: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s;
+            position: relative;
+        }
+        .category-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         .category-info {
             flex: 1;
+            margin-right: 20px;
         }
         .category-name {
-            font-weight: 500;
+            font-weight: 600;
             font-size: 16px;
+            color: #1f2937;
+            margin-bottom: 4px;
         }
         .category-desc {
-            color: #666;
+            color: #6b7280;
             font-size: 14px;
-            margin-top: 4px;
+            line-height: 1.5;
         }
         .category-actions {
             display: flex;
-            gap: 8px;
+            gap: 10px;
+            align-items: center;
         }
         .btn {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         .btn-edit {
-            background: #007bff;
+            background: #3b82f6;
             color: white;
         }
         .btn-edit:hover {
-            background: #0056b3;
+            background: #2563eb;
+            transform: translateY(-1px);
         }
         .btn-delete {
-            background: #dc3545;
+            background: #ef4444;
             color: white;
         }
         .btn-delete:hover {
-            background: #c82333;
+            background: #dc2626;
+            transform: translateY(-1px);
         }
         .btn-save {
-            background: #28a745;
+            background: #10b981;
             color: white;
         }
         .btn-save:hover {
-            background: #218838;
+            background: #059669;
+            transform: translateY(-1px);
         }
         .btn-cancel {
-            background: #6c757d;
+            background: #6b7280;
             color: white;
         }
         .btn-cancel:hover {
-            background: #5a6268;
+            background: #4b5563;
+            transform: translateY(-1px);
         }
         .edit-form {
             display: none;
             width: 100%;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 6px;
         }
         .edit-form.active {
             display: block;
         }
         .edit-form input {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
             box-sizing: border-box;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .edit-form input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         .edit-form .form-row {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             align-items: center;
         }
         .edit-form input[type="number"] {
             width: 80px;
+        }
+        .category-item.editing .category-info,
+        .category-item.editing .category-actions {
+            display: none;
+        }
+        .category-item.editing .edit-form {
+            display: block;
         }
     </style>
 </head>
@@ -185,14 +218,16 @@
 
     function showEditForm(id, name, desc) {
         const form = document.getElementById(`edit-form-${id}`);
+        const categoryItem = form.parentElement;
         document.getElementById(`edit-name-${id}`).value = name;
         document.getElementById(`edit-desc-${id}`).value = desc;
-        form.classList.add("active");
+        categoryItem.classList.add("editing");
     }
 
     function hideEditForm(id) {
         const form = document.getElementById(`edit-form-${id}`);
-        form.classList.remove("active");
+        const categoryItem = form.parentElement;
+        categoryItem.classList.remove("editing");
     }
 
     async function updateCategory(id) {
@@ -220,8 +255,19 @@
             return;
         }
         
-        hideEditForm(id);
-        await loadCategories();
+        const form = document.getElementById(`edit-form-${id}`);
+        const categoryItem = form.parentElement;
+        const categoryInfo = categoryItem.querySelector('.category-info');
+        const categoryName = categoryInfo.querySelector('.category-name');
+        const categoryDesc = categoryInfo.querySelector('.category-desc');
+        
+        categoryName.textContent = name;
+        categoryDesc.textContent = desc || "暂无描述";
+        
+        const editBtn = categoryItem.querySelector('.btn-edit');
+        editBtn.setAttribute('onclick', `showEditForm(${id}, '${name.replace(/'/g, "\\'")}', '${desc.replace(/'/g, "\\'") || ''}')`);
+        
+        categoryItem.classList.remove("editing");
     }
 
     async function deleteCategory(id, name) {
