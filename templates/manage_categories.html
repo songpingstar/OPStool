@@ -111,10 +111,6 @@
             <label>描述</label>
             <input id="cat-desc" type="text" placeholder="可选">
         </div>
-        <div class="form-row">
-            <label>排序</label>
-            <input id="cat-order" type="number" value="0">
-        </div>
         <button id="cat-create-btn">创建分类</button>
     </section>
 
@@ -133,12 +129,11 @@
             return;
         }
         const desc = document.getElementById("cat-desc").value.trim();
-        const order = parseInt(document.getElementById("cat-order").value || "0");
         
         const resp = await fetch("/api/categories", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({name: name, description: desc || null, order: order})
+            body: JSON.stringify({name: name, description: desc || null, order: 0})
         });
         
         if (!resp.ok) {
@@ -150,7 +145,6 @@
         alert("分类创建成功");
         document.getElementById("cat-name").value = "";
         document.getElementById("cat-desc").value = "";
-        document.getElementById("cat-order").value = "0";
         await loadCategories();
     }
 
@@ -172,17 +166,15 @@
                 <div class="category-info">
                     <div class="category-name">${cat.name}</div>
                     <div class="category-desc">${cat.description || "暂无描述"}</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 4px;">排序: ${cat.order}</div>
                 </div>
                 <div class="category-actions">
-                    <button class="btn btn-edit" onclick="showEditForm(${cat.id}, '${cat.name}', '${cat.description || ''}', ${cat.order})">编辑</button>
+                    <button class="btn btn-edit" onclick="showEditForm(${cat.id}, '${cat.name}', '${cat.description || ''}')">编辑</button>
                     <button class="btn btn-delete" onclick="deleteCategory(${cat.id}, '${cat.name}')">删除</button>
                 </div>
                 <div class="edit-form" id="edit-form-${cat.id}">
                     <input type="text" id="edit-name-${cat.id}" placeholder="分类名称">
                     <input type="text" id="edit-desc-${cat.id}" placeholder="描述">
                     <div class="form-row">
-                        <input type="number" id="edit-order-${cat.id}" placeholder="排序">
                         <button class="btn btn-save" onclick="updateCategory(${cat.id})">保存</button>
                         <button class="btn btn-cancel" onclick="hideEditForm(${cat.id})">取消</button>
                     </div>
@@ -192,11 +184,10 @@
         }
     }
 
-    function showEditForm(id, name, desc, order) {
+    function showEditForm(id, name, desc) {
         const form = document.getElementById(`edit-form-${id}`);
         document.getElementById(`edit-name-${id}`).value = name;
         document.getElementById(`edit-desc-${id}`).value = desc;
-        document.getElementById(`edit-order-${id}`).value = order;
         form.classList.add("active");
     }
 
@@ -208,7 +199,6 @@
     async function updateCategory(id) {
         const name = document.getElementById(`edit-name-${id}`).value.trim();
         const desc = document.getElementById(`edit-desc-${id}`).value.trim();
-        const order = parseInt(document.getElementById(`edit-order-${id}`).value || "0");
         
         if (!name) {
             alert("分类名称不能为空");
@@ -221,7 +211,7 @@
             body: JSON.stringify({
                 name: name,
                 description: desc || null,
-                order: order
+                order: 0
             })
         });
         

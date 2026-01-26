@@ -140,16 +140,10 @@ async def manage_scripts(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_auth),
 ):
-    categories = (
-        db.query(models.ScriptCategory)
-        .order_by(models.ScriptCategory.order)
-        .all()
-    )
     return templates.TemplateResponse(
         "manage_scripts.html",
         {
             "request": request,
-            "categories": categories,
         },
     )
 

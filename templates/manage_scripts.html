@@ -15,15 +15,6 @@
     <section class="manage-panel">
         <h2>新增脚本</h2>
         <div class="form-row">
-            <label>所属分类</label>
-            <select id="script-category">
-                <option value="">未分类</option>
-                {% for cat in categories %}
-                    <option value="{{ cat.id }}">{{ cat.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-row">
             <label>标题</label>
             <input id="script-title" type="text" placeholder="脚本显示名称">
         </div>
@@ -68,7 +59,6 @@
                 <th>ID</th>
                 <th>标题</th>
                 <th>类型</th>
-                <th>分类</th>
                 <th>危险</th>
                 <th>启用</th>
                 <th>更新时间</th>
@@ -82,7 +72,6 @@
 </main>
 <script>
     async function createScript() {
-        const categoryId = document.getElementById("script-category").value;
         const title = document.getElementById("script-title").value.trim();
         const desc = document.getElementById("script-desc").value.trim();
         const type = document.getElementById("script-type").value;
@@ -100,7 +89,7 @@
         }
 
         const payload = {
-            category_id: categoryId ? parseInt(categoryId) : null,
+            category_id: null,
             title: title,
             description: desc || null,
             script_type: type,
@@ -140,7 +129,7 @@
         if (!data.length) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = 8;
+            td.colSpan = 7;
             td.innerText = "暂无脚本";
             tr.appendChild(td);
             tbody.appendChild(tr);
@@ -152,7 +141,6 @@
                 <td>${s.id}</td>
                 <td>${s.title}</td>
                 <td>${s.script_type}</td>
-                <td>${s.category_id || "-"}</td>
                 <td>${s.is_dangerous ? "是" : "否"}</td>
                 <td>${s.enabled ? "是" : "否"}</td>
                 <td>${s.update_time}</td>
