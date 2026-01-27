@@ -1,10 +1,12 @@
 from sqlalchemy.orm import Session
 
 from app import auth, models
-from app.database import SessionLocal
+from app.database import SessionLocal, engine, Base
 
 
 def init_db():
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     try:
         user = db.query(models.User).filter(models.User.username == "admin").first()

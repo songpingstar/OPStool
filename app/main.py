@@ -304,20 +304,6 @@ def create_script(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_auth),
 ):
-    script = models.ScriptItem(
-        category_id=payload.category_id,
-        title=payload.title,
-        description=payload.description,
-        script_type=payload.script_type,
-        exec_command_template=payload.exec_command_template,
-        script_path=None,
-        enabled=payload.enabled,
-        is_dangerous=payload.is_dangerous,
-    )
-    db.add(script)
-    db.commit()
-    db.refresh(script)
-
     scripts_dir = Path("scripts")
     scripts_dir.mkdir(exist_ok=True)
     
@@ -326,12 +312,30 @@ def create_script(
         "powershell": ".ps1",
         "shell": ".sh"
     }
+    
+    script = models.ScriptItem(
+        category_id=payload.category_id,
+        title=payload.title,
+        description=payload.description,
+        script_type=payload.script_type,
+        exec_command_template=payload.exec_command_template,
+        script_path="",
+        enabled=payload.enabled,
+        is_dangerous=payload.is_dangerous,
+    )
+    db.add(script)
+    db.commit()
+    db.refresh(script)
+    
     ext = ext_map.get(payload.script_type, ".py")
     script_path = scripts_dir / f"{script.id}{ext}"
     
     if payload.initial_content is not None:
         script_path.write_text(payload.initial_content, encoding="utf-8")
+    else:
+        script_path.write_text("", encoding="utf-8")
 
+    if payload.initial_content is not None:
         version = models.ScriptVersion(
             script_id=script.id,
             version=1,
