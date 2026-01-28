@@ -53,6 +53,11 @@ def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@app.get("/landing", response_class=HTMLResponse)
+def landing_page(request: Request):
+    return templates.TemplateResponse("landing.html", {"request": request})
+
+
 @app.post("/api/login")
 def login(
     request: Request,
@@ -304,6 +309,19 @@ def create_script(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_auth),
 ):
+    script = models.ScriptItem(
+        category_id=payload.category_id,
+        title=payload.title,
+        description=payload.description,
+        script_type=payload.script_type,
+        exec_command_template=payload.exec_command_template,
+        enabled=payload.enabled,
+        is_dangerous=payload.is_dangerous,
+    )
+    db.add(script)
+    db.commit()
+    db.refresh(script)
+
     scripts_dir = Path("scripts")
     scripts_dir.mkdir(exist_ok=True)
     
@@ -312,21 +330,6 @@ def create_script(
         "powershell": ".ps1",
         "shell": ".sh"
     }
-    
-    script = models.ScriptItem(
-        category_id=payload.category_id,
-        title=payload.title,
-        description=payload.description,
-        script_type=payload.script_type,
-        exec_command_template=payload.exec_command_template,
-        script_path="",
-        enabled=payload.enabled,
-        is_dangerous=payload.is_dangerous,
-    )
-    db.add(script)
-    db.commit()
-    db.refresh(script)
-    
     ext = ext_map.get(payload.script_type, ".py")
     script_path = scripts_dir / f"{script.id}{ext}"
     
